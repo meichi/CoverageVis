@@ -1,0 +1,11 @@
+{
+    "nodes":[
+        {"name": "node0", "group": 1, "size": 10},
+        {"name": "node1", "group": 2, "size": 20},
+        {"name": "node2", "group": 3, "size": 14},
+        {"name": "node3", "group": 1, "size": 11}
+    ],
+    "links":[
+        {"source":3, "target":0, "value":1}
+    ]
+}
