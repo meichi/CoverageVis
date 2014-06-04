@@ -78,6 +78,12 @@ class JavaFile(object):
     def setBranchCoverage(self, branch_coverage):
         self.branch_coverage = branch_coverage
 
+    def getLineCoverage(self):
+        return self.line_coverage
+
+    def getBranchCoverage(self):
+        return self.branch_coverage
+
 
 
 class Package(object):
@@ -87,6 +93,7 @@ class Package(object):
         self.line_coverage = line_coverage
         self.branch_coverage = branch_coverage
         self.files = []
+        self.importance = 0
 
     def addFile(self, javaFile):
         self.files.append(javaFile)
@@ -117,6 +124,12 @@ class Package(object):
 
     def getBranchCoverage(self):
         return self.branch_coverage
+
+    def setImportance(self, importance):
+        self.importance = importance
+
+    def getImportance(self):
+        return self.importance
 
 
 
@@ -199,28 +212,39 @@ if __name__ == "__main__":
                     if imports.find(col_package.getName()) != -1:
                         table[i][j] += 1
 
+
+    for col in range(package_len):
+        den = 0
+        for row in range(package_len):
+            den += table[row][col]
+        packagelist[col].setImportance(den)
+
+
     packages = []
-    for package in packagelist:
+    files = []
+    for (i, package) in enumerate(packagelist):
         m = {}
         m["name"] = package.getName()
         m["size"] = package.getNumOfLines()
         m["line-rate"] = package.getLineCoverage()
         m["branch-rate"] = package.getBranchCoverage()
+        m["importance"] = package.getImportance()
+        m["group"] = str(i)
         packages.append(m)
+        for file_ in package.getFiles():
+            m_f = {}
+            m_f["name"] = file_.getFileName()
+            m_f["size"] = file_.getNumOfLines()
+            m_f["line-rate"] = file_.getLineCoverage()
+            m_f["branch-rate"] = file_.getBranchCoverage()
+            m_f["group"] = i
+            files.append(m_f)
 
-    links = []
-    for i in range(package_len):
-        for j in range(package_len):
-            m = {}
-            m["source"] = i
-            m["target"] = j
-            m["dependency"] = table[i][j]
-            links.append(m)
 
 
     jsonObj = {}
     jsonObj["packages"] = packages
-    jsonObj["links"] = links
+    jsonObj["classes"] = files
 
     
     with open('myjson.json', "w") as outfile:

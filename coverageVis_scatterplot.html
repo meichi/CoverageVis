@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>CoverageVis-scatter plot</title>
+    <script type="text/javascript" src="js/d3.min.js"></script>
+
+    <style>
+
+        body {
+            font: 10px sans-serif;
+        }
+
+        .dot {
+        }
+
+
+    </style>
+
+
+</head>
+
+<body>
+
+    <script>
+
+
+        var redraw = function(dataset){
+
+        
+        };
+
+
+    var margin = {top: 20, bottom: 20, left: 30, right: 30},
+        width = 1024 - margin.left - margin.right,
+        height = 1080 - margin.top - margin.bottom;
+
+    var x = d3.scale.linear().range([0, width]);
+    var y = d3.scale.linear().range([height, 0]);
+
+    var importanceScale = d3.scale.linear().range([0, 0.99]);
+
+    var color = d3.interpolateLab("#008000", "#c83a22");
+    var radius = d3.scale.linear();
+    radius.range([10, 50]);
+
+    var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom");
+
+    var yAxis = d3.svg.axis()
+        .scale(y)
+        .orient("left");
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    var packages;
+    var classes;
+
+    d3.json("json/myjson.json", function(error, data) {
+
+        //assign global variables
+        packages = data["packages"];
+        classes = data["classes"];
+
+        map_class = d3.map();
+
+        packages.forEach(function(p){
+            map_class.set(p["group"], []);
+        });
+
+        classes.forEach(function(c){
+            map_class.get(c["group"]).push(c);
+        });
+
+        //console.log(map_class);
+
+
+        radius.domain([d3.min(packages, function(d){return d["size"]}), d3.max(packages, function(d){return d["size"];})]);
+        x.domain([d3.min(packages, function(d){ return d["line-rate"]; }), d3.max(packages, function(d){ return d["line-rate"]; })]);
+        y.domain([d3.min(packages, function(d){ return d["branch-rate"]; }), d3.max(packages, function(d){ return d["branch-rate"]; })]);
+        importanceScale.domain([d3.min(packages, function(d){ return d["importance"];}), d3.max(packages, function(d){ return d["importance"];})]);
+
+        //x.domain(d3.extent(data, function(d) { return d["line-rate"]; })).nice();
+        //y.domain(d3.extent(data, function(d) { return d["branch-rate"]; })).nice();
+
+        svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis)
+        .append("text")
+        .attr("class", "label")
+        .attr("x", width)
+        .attr("y", -6)
+        .style("text-anchor", "end")
+        .text("line coverage");
+
+        svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+        .append("text")
+        .attr("class", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("branch coverage");
+
+
+        var circles = svg.selectAll(".dot").data(packages)
+        .enter().append("circle");
+
+        circles.attr("class", "dot")
+        .attr("r", function(d){
+            return radius(d["size"]);
+        })
+        .attr("cx", function(d){
+            return x(d["line-rate"]);
+        })
+        .attr("cy", function(d){
+            return y(d["branch-rate"]);
+        })
+        .style("fill",function(d){
+            return color(importanceScale(d["importance"]));
+        }).append("title").text(function(d){
+            return d["name"];
+        });
+            
+        circles.on("click",function(e){
+            redraw(map_class.get(e["group"]));
+        });
+
+
+
+});
+
+
+    </script>
+
+
+
+
+</body>
+</html>
+
