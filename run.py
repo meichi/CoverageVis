@@ -3,30 +3,61 @@ import os
 import xml.etree.ElementTree as ET
 import json
 
+
+class Project(object):
+    def __init__(self, line_coverage = 0, branch_coverage = 0):
+        self.line_coverage =  line_coverage
+        self.branch_coverage = branch_coverage
+        self.packages = []
+
+    def addPackages(self, package):
+        self.packages.append(package)
+
+    def getPackages(self):
+        return self.packages
+
+
+
+
+
 class JavaFile(object):
-    def __init__(self, fileName):
-        self.line_coverage = 0
-        self.branch_coverage = 0
+    def __init__(self, name, pathName, line_coverage = 0.0, branch_coverage = 0.0, numOfLines = 0):
+        self.name = name
+        self.pathName = pathName
+        self.line_coverage = line_coverage
+        self.branch_coverage = branch_coverage
         self.imports = []
-        f = open(fileName)
+        self.numOfLines = numOfLines
+
+    def getPathName(self):
+        """return absolute name like: org/apache/commons/MyClass.java"""
+        return self.pathName
+    
+    def getFileName(self):
+        """return just file name like: ArrayList.java """
+        return self.pathName.split("/")[-1];
+
+
+    def parseFile(self, dir_name):
+        if dir_name[-1] != "/":
+            dir_name = dir_name + "/"
+
+        f = open(dir_name + self.getPathName())
+        lines = 0
         try:
-            self.fileName = f.name.split("/")[-1]
-            lines = 0
             for line in f:
                 lines += 1
-                packageIndex = line.find("package")
-                if packageIndex!= -1:
-                    self.packageName = line[packageIndex + 7 : -1].strip()[:-1]
-
                 importIndex = line.find("import")
                 if importIndex != -1:
-                    self.imports.append(line[importIndex + 6 : -1].strip()[:-1])
-
+                    self.addImport(line[importIndex + 6: -1].strip()[:-1])
             self.numOfLines = lines
-            
 
         finally:
             f.close()
+
+
+    def addImport(self, import_):
+        self.imports.append(import_)
 
     def getPackageName(self):
         return self.packageName
@@ -37,8 +68,6 @@ class JavaFile(object):
     def getImports(self):
         return self.imports
 
-    def getFileName(self):
-        return self.fileName
 
     def __repr__(self):
         return self.getFileName() + ", size: " + str(self.getNumOfLines()) + "," + "line: " + str(self.line_coverage) + ", branch:" + str(self.branch_coverage)
@@ -51,12 +80,19 @@ class JavaFile(object):
 
 
 
-class JavaPackage(object):
-    def __init__(self, package_name):
-        self.numOfLines = 0
-        self.name = package_name
-        self.line_coverage = 0
-        self.branch_coverage = 0
+class Package(object):
+    def __init__(self, name = None, line_coverage = 0, branch_coverage = 0, numOfLines = 0):
+        self.numOfLines = numOfLines
+        self.name = name
+        self.line_coverage = line_coverage
+        self.branch_coverage = branch_coverage
+        self.files = []
+
+    def addFile(self, javaFile):
+        self.files.append(javaFile)
+
+    def getFiles(self):
+        return self.files
 
     def getName(self):
         return self.name
@@ -78,6 +114,7 @@ class JavaPackage(object):
 
     def getLineCoverage(self):
         return self.line_coverage
+
     def getBranchCoverage(self):
         return self.branch_coverage
 
@@ -120,43 +157,50 @@ if __name__ == "__main__":
     dir_name = sys.argv[1]
     cobertua_file = sys.argv[2]
 
-    results = {}
-    build(dir_name, results)
+
+
+#    results = {}
+#    build(dir_name, results)
 
     root = ET.parse(cobertua_file).getroot()
 
+    project = Project(float(root.attrib["line-rate"]), float(root.attrib["branch-rate"]))
+
     for packageDom in root.iter("package"):
-        #packageAttributes = package.attrib
-        (package, filelist) = results.get(packageDom.attrib["name"], (None, None))
-
-        if package is not None:
-            package.setLineCoverage(float(packageDom.attrib["line-rate"]))
-            package.setBranchCoverage(float(packageDom.attrib["branch-rate"]))
-
-        if filelist is not None:
-            for classDom in packageDom.iter("class"):
-                for i in range(len(filelist)):
-                    if classDom.attrib["filename"].split("/")[-1] == filelist[i].getFileName():
-                        filelist[i].setLineCoverage(float(classDom.attrib["line-rate"]))
-                        filelist[i].setBranchCoverage(float(classDom.attrib["branch-rate"]))
-                        break
+        cur_package = Package(name = packageDom.attrib["name"], line_coverage = float(packageDom.attrib["line-rate"]), branch_coverage = float(packageDom.attrib["branch-rate"]) )
+        project.addPackages(cur_package)
+        for classDom in packageDom.iter("class"):
+            if os.path.exists(dir_name + classDom.attrib["filename"]):
+                cur_class = JavaFile(name = classDom.attrib["name"], pathName = classDom.attrib["filename"], line_coverage = float(classDom.attrib["line-rate"]), branch_coverage = float(classDom.attrib["branch-rate"]))
+                cur_package.addFile(cur_class)
+                cur_class.parseFile(dir_name)
+                cur_package.addLines(cur_class.getNumOfLines())
+        if cur_package.getNumOfLines() == 0:
+            del project.getPackages()[-1]
 
 
-    packagelist = list(results.keys())
-    table = [[0] * len(packagelist)] * len(packagelist) # two dimensional array
+    """
+    for p in project.getPackages():
+        print "package name: " + p.getName() + ", num of lines: " + str(p.getNumOfLines()) + ", num of classes: " + str(len(p.getFiles()))
+        for klass in p.getFiles():
+            print "\t" + klass.getFileName() + ", import:" + str(klass.getImports())
+        print "\n\n"
+    """
 
-    for i in range(len(packagelist)):
-        filelist = results[packagelist[i]][1]
-        for j in range(len(packagelist)):
+    packagelist = project.getPackages()
+    package_len = len(packagelist)
+    table = [[0] * package_len] * package_len # two dimensional array
+
+    for (i, row_package) in enumerate(packagelist):
+        filelist = row_package.getFiles()
+        for (j, col_package) in enumerate(packagelist):
             for file_ in filelist:
                 for imports in file_.getImports():
-                    if imports.find(packagelist[j]) != -1:
+                    if imports.find(col_package.getName()) != -1:
                         table[i][j] += 1
 
-
     packages = []
-    for packagename in packagelist:
-        package = results[packagename][0]
+    for package in packagelist:
         m = {}
         m["name"] = package.getName()
         m["size"] = package.getNumOfLines()
@@ -165,8 +209,8 @@ if __name__ == "__main__":
         packages.append(m)
 
     links = []
-    for i in range(len(packagelist)):
-        for j in range(len(packagelist)):
+    for i in range(package_len):
+        for j in range(package_len):
             m = {}
             m["source"] = i
             m["target"] = j
@@ -181,7 +225,6 @@ if __name__ == "__main__":
     
     with open('myjson.json', "w") as outfile:
         json.dump(jsonObj, outfile)
-
 
     #print results
     #for (packagename, (package, filelist)) in results.items():

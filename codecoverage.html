@@ -32,14 +32,17 @@
 
     <script>
 
-    var width = 960;
-    var height = 500;
+    var width = 1024;
+    var height = 1080;
 
-    var color = d3.scale.category20();
+    //var color = d3.scale.category20();
+    var color = d3.interpolateLab("#c83a22", "#008000");
+    var radius = d3.scale.linear();
+    radius.range([10, 50]);
 
     var force = d3.layout.force()
         .charge(-120)
-        .linkDistance(80)
+        .linkDistance(350)
         .size([width, height]);
 
     var svg = d3.select("body").append("svg")
@@ -47,8 +50,10 @@
         .attr("height", height);
 
     d3.json("data.json", function(error, graph) {
+
+        radius.domain([d3.min(graph.packages, function(d){return d["size"]}), d3.max(graph.packages, function(d){return d["size"];})]);
         force
-            .nodes(graph.nodes)
+            .nodes(graph.packages)
             .links(graph.links)
             .start();
 
@@ -56,18 +61,22 @@
         .data(graph.links)
         .enter().append("line")
         .attr("class", "link")
-        .style("stroke-width", function(d) { return Math.sqrt(d.value); });
+        .style("stroke-width", function(d) { 
+            return Math.sqrt(d.dependency); 
+        });
 
     var node = svg.selectAll(".node")
-        .data(graph.nodes)
+        .data(graph.packages)
         .enter().append("circle")
         .attr("class", "node")
-        .attr("r", 5)
-        .style("fill", function(d) { return color(d.group); })
+        .attr("r", function(d){ return radius(d["size"]); })
+        .style("fill", function(d) { 
+            return color(d["line-rate"]); 
+        })
         .call(force.drag);
 
   node.append("title")
-      .text(function(d) { return d.name; });
+      .text(function(d) { return (d.name + d["line-rate"] ); });
 
   force.on("tick", function() {
     link.attr("x1", function(d) { return d.source.x; })
